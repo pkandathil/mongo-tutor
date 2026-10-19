@@ -9,5 +9,5 @@
 // Grade it:         npm run check -- 01/05
 
 async function solution(db) {
-
+    return await db.collection("orders").countDocuments({"status": "cancelled"});
 }
