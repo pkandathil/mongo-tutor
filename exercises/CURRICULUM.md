@@ -1,6 +1,7 @@
 # Curriculum
 
 All exercises use the **Page & Quill bookstore** dataset (database `tutor`): see [`../DATASET.md`](../DATASET.md).
+Every answer is written with the **MongoDB Node.js driver** (`async function solution(db)`, `db.collection("…")`), so the skills carry straight over to app code.
 
 | # | Module | Status | Concepts |
 |---|--------|--------|----------|
@@ -13,6 +14,6 @@ All exercises use the **Page & Quill bookstore** dataset (database `tutor`): see
 | 07 | Reshaping & joining | planned | `$unwind`, `$lookup`, `$addFields/$set`, expressions (`$multiply`, `$cond`, `$ifNull`, `$concat`), `$replaceRoot` |
 | 08 | Advanced aggregation | planned | `$facet`, `$bucket/$bucketAuto`, `$setWindowFields`, date operators (`$dateTrunc`, `$dateToString`), `$filter/$map/$reduce` |
 | 09 | Indexes & performance | planned | `createIndex`, compound indexes & ESR rule, `explain("executionStats")`, covered queries |
-| 10 | From the Node.js driver | planned | same queries from app code, async/await, cursors, `ObjectId` handling |
+| 10 | The driver in a real app | planned | `MongoClient` lifecycle & connection pooling, error handling (`MongoServerError`, duplicate keys), `ObjectId` from request strings, iterating large cursors (`for await`), `bulkWrite`, transactions/sessions |
 
 Additional targeted practice lives in [`drills/`](drills/) — short exercises generated when progress shows a concept is shaky.

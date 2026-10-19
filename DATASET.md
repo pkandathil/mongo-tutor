@@ -9,7 +9,7 @@ Database **`tutor`** on `localhost:27018`. Regenerate any time with `npm run see
 | `orders` | 1,500 | Orders placed Jan 2024 – Dec 2025 |
 | `reviews` | ~870 | Star ratings left on products |
 
-Explore it yourself: `npm run db:shell`, then `db.products.findOne()`.
+Explore it yourself: `npm run try -- playground/scratch.js` (returns one product), or `npm run db:shell` then `db.products.findOne()`. The examples below are in shell notation: `ObjectId('…')` and `ISODate('…')` are `new ObjectId('…')` and `new Date('…')` in Node.
 
 ## customers
 ```js

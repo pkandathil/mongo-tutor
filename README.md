@@ -4,7 +4,7 @@ A hands-on practice environment for learning MongoDB queries and aggregation pip
 
 ## Setup (once)
 
-Requires Docker, Node.js and `mongosh`.
+Requires Docker and Node.js. Answers use the official [MongoDB Node.js driver](https://www.mongodb.com/docs/drivers/node/current/), the same `mongodb` package that real apps use. `mongosh` is optional; you only need it for `npm run db:shell`.
 
 ```sh
 npm install
@@ -17,19 +17,19 @@ npm run db:up        # starts MongoDB on localhost:27018 and seeds it if empty
 
 1. Pick the next exercise: `npm run status` (or browse [`exercises/CURRICULUM.md`](exercises/CURRICULUM.md)).
 2. Read it, e.g. [`exercises/01-find-basics/01.md`](exercises/01-find-basics/01.md). The data is described in [`DATASET.md`](DATASET.md).
-3. Open the matching answer file, e.g. `answers/01-find-basics/01.js`. It already contains a `solution(db)` function — `db` is connected for you, so just write the query and **return** it:
+3. Open the matching answer file, e.g. `answers/01-find-basics/01.js`. It already contains an `async solution(db)` function. `db` is a connected driver `Db`, so just write the query and **return** it:
    ```js
-   function solution(db) {
-     return db.products.find({ ... });
+   async function solution(db) {
+     return db.collection("products").find({ ... }).toArray();
    }
    ```
-   You can use variables inside the function (e.g. build a `filter` first), as long as you `return` the result at the end.
+   You can use variables and `await` inside the function (e.g. build a `filter` first), as long as you `return` the result at the end. `console.log()` output shows up in `npm run try`. Need an `ObjectId`? Put `const { ObjectId } = require("mongodb");` above the function.
 4. See what it returns: `npm run try -- 01/01`
 5. Grade it: `npm run check -- 01/01` (or a whole module: `npm run check -- 01`)
 6. Ask Claude to review it — e.g. *"check 01/01"* or *"review my module 2 answers"*. Claude runs it, explains what's right or wrong, and records your progress in [`progress/`](progress/).
 7. Commit your answers whenever you like — they're yours, and git history shows your learning.
 
-Experiment freely in [`playground/scratch.js`](playground/scratch.js) (`npm run try -- playground/scratch.js`) or in the interactive shell (`npm run db:shell`).
+Experiment freely in [`playground/scratch.js`](playground/scratch.js) (`npm run try -- playground/scratch.js`). The interactive shell (`npm run db:shell`) is handy for poking around, but it speaks mongosh syntax (`db.products.find()`), not driver syntax.
 
 ## Things to ask Claude
 

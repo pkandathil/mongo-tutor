@@ -1,22 +1,29 @@
 #!/usr/bin/env node
 // Waits until the tutor MongoDB answers a ping, then seeds it if empty.
-const { spawnSync } = require('child_process');
-const path = require('path');
-const { uri } = require('./lib');
+const { MongoClient } = require('mongodb');
+const { seed } = require('../seed/seed');
 
-const ping = () => spawnSync('mongosh', [uri('tutor'), '--quiet', '--eval', 'db.runCommand({ping:1}).ok && db.products.estimatedDocumentCount()'], { encoding: 'utf8' });
-for (let i = 0; i < 60; i++) {
-  const r = ping();
-  if (r.status === 0) {
-    const count = Number(r.stdout.trim());
-    if (!count) {
-      console.log('Database is empty — seeding…');
-      spawnSync('mongosh', [uri('tutor'), '--quiet', path.join(__dirname, '..', 'seed', 'seed.js')], { stdio: 'inherit' });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+(async () => {
+  for (let i = 0; i < 60; i++) {
+    const client = new MongoClient('mongodb://localhost:27018/?directConnection=true', { serverSelectionTimeoutMS: 2000 });
+    try {
+      const db = client.db('tutor');
+      await db.command({ ping: 1 });
+      if (!(await db.collection('products').estimatedDocumentCount())) {
+        console.log('Database is empty — seeding…');
+        const n = await seed(db);
+        console.log(`Seeded "tutor": customers=${n.customers} products=${n.products} orders=${n.orders} reviews=${n.reviews}`);
+      }
+      console.log('MongoDB is ready on localhost:27018 (database: tutor)');
+      return;
+    } catch {
+      await sleep(2000);
+    } finally {
+      await client.close();
     }
-    console.log('MongoDB is ready on localhost:27018 (database: tutor)');
-    process.exit(0);
   }
-  spawnSync('sleep', ['2']);
-}
-console.error('MongoDB did not become ready in time. Check `docker compose logs mongo-tutor`.');
-process.exit(1);
+  console.error('MongoDB did not become ready in time. Check `docker compose logs mongo-tutor`.');
+  process.exitCode = 1;
+})();

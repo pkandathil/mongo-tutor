@@ -1,6 +1,8 @@
 // Your playground. Experiment freely, then run:
 //   npm run try -- playground/scratch.js
+// console.log() output is shown too. Need an ObjectId?
+//   const { ObjectId } = require("mongodb");
 
-function solution(db) {
-  return db.products.findOne();
+async function solution(db) {
+  return db.collection("products").findOne();
 }

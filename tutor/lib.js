@@ -1,13 +1,14 @@
-// Shared helpers for running answer files through mongosh and comparing results.
+// Shared helpers for running answer files with the MongoDB Node.js driver and comparing results.
 const fs = require('fs');
 const path = require('path');
-const { execFileSync, spawnSync } = require('child_process');
+const util = require('util');
+const vm = require('vm');
 const acorn = require('acorn');
+const { MongoClient, BSON } = require('mongodb');
 
 const ROOT = path.resolve(__dirname, '..');
 const HOST = 'mongodb://localhost:27018';
 const uri = (dbName) => `${HOST}/${dbName}?directConnection=true`;
-const MARKER = '__TUTOR_RESULT__';
 
 const EXERCISES = JSON.parse(fs.readFileSync(path.join(__dirname, 'exercises.json'), 'utf8'));
 
@@ -26,11 +27,9 @@ function resolveId(arg) {
   }) || null;
 }
 
-const parse = (src) => acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'script', allowAwaitOutsideFunction: true });
+const parse = (src) => acorn.parse(src, { ecmaVersion: 'latest', sourceType: 'script', locations: true });
 
-// Answers are normally written as `function solution(db) { return ... }`.
-// A bare expression as the last statement is also accepted (used by the
-// reference solutions and for quick experiments).
+// Every answer (and reference solution) defines `async function solution(db) { return ... }`.
 const findSolutionFn = (ast) => ast.body.find((n) => n.type === 'FunctionDeclaration' && n.id && n.id.name === 'solution');
 
 // True if the file contains real code (a non-empty solution() body, or any statement).
@@ -44,9 +43,69 @@ function hasCode(src) {
   }
 }
 
-// Rewrite the answer so the value of its last expression is captured, then
-// serialised as relaxed EJSON (cursors are drained with toArray()).
-function buildScript(src) {
+class UserError extends Error {}
+
+// A query started without `await`/`return` can still be running when we close
+// the client; its rejection would otherwise crash the process.
+process.on('unhandledRejection', (e) => {
+  if (e && /^Mongo/.test(e.name)) return;
+  console.error(e);
+  process.exitCode = 1;
+});
+
+// The driver's find()/findOne() take OPTIONS as the second argument, so a
+// mongosh-style projection such as find({}, { title: 1 }) is silently ignored.
+const FIND_OPTIONS = new Set(['projection', 'sort', 'limit', 'skip', 'hint', 'collation', 'comment', 'maxTimeMS', 'batchSize', 'allowDiskUse', 'let', 'min', 'max', 'returnKey', 'showRecordId', 'session', 'timeoutMS']);
+function lintWarnings(ast) {
+  const warnings = [];
+  const walk = (node) => {
+    if (!node || typeof node.type !== 'string') return;
+    if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && ['find', 'findOne'].includes(node.callee.property.name)) {
+      const opts = node.arguments[1];
+      if (opts && opts.type === 'ObjectExpression') {
+        const unknown = opts.properties.map((p) => p.key && (p.key.name || p.key.value)).filter((k) => k && !FIND_OPTIONS.has(k));
+        if (unknown.length) {
+          warnings.push(`⚠️  Line ${node.loc.start.line}: ${node.callee.property.name}() ignores ${unknown.map((k) => `\`${k}\``).join(', ')} — in the Node driver the 2nd argument is *options*.\n   To choose fields, wrap them:  .${node.callee.property.name}(filter, { projection: { ${unknown[0]}: 1 } })`);
+        }
+      }
+    }
+    for (const k of Object.keys(node)) {
+      const v = node[k];
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object' && k !== 'loc') walk(v);
+    }
+  };
+  walk(ast);
+  return warnings;
+}
+
+// ---------- connection (one client per process; call close() before exiting) ----------
+let client = null;
+async function getClient() {
+  if (!client) {
+    client = new MongoClient(`${HOST}/?directConnection=true`, { serverSelectionTimeoutMS: 5000 });
+    try {
+      await client.connect();
+    } catch (e) {
+      client = null;
+      throw new UserError(`Could not connect to MongoDB on localhost:27018 — is it running? Try \`npm run db:up\`.\n  (${e.message})`);
+    }
+  }
+  return client;
+}
+async function getDb(dbName) {
+  return (await getClient()).db(dbName);
+}
+async function close() {
+  if (client) await client.close();
+  client = null;
+}
+
+// ---------- running answers ----------
+
+// Turns the source into its solution() function. The wrapper is kept on the
+// first line so line numbers in error messages match the user's file.
+function compile(src, filename) {
   let ast;
   try {
     ast = parse(src);
@@ -54,69 +113,58 @@ function buildScript(src) {
     throw new UserError(`JavaScript syntax error: ${e.message}\n  (line ${e.loc && e.loc.line}, column ${e.loc && e.loc.column + 1})`);
   }
   const fn = findSolutionFn(ast);
-  if (fn) {
-    if (!fn.body.body.length) throw new UserError('Your solution() function is still empty — write your query inside it and `return` it.');
-    return `${src}
-globalThis.__tutorRaw = solution(db);
-if (globalThis.__tutorRaw === undefined) {
-  print(${JSON.stringify(MARKER)} + JSON.stringify({ noReturn: true }));
-} else {
-  let __tutorVal = globalThis.__tutorRaw;
-  if (__tutorVal && typeof __tutorVal.toArray === 'function') __tutorVal = __tutorVal.toArray();
-  print(${JSON.stringify(MARKER)} + EJSON.stringify({ value: __tutorVal }, { relaxed: true }));
-}
-`;
-  }
-  const last = ast.body[ast.body.length - 1];
-  if (!last) throw new UserError('The answer file has no code yet.');
-  if (last.type !== 'ExpressionStatement') {
-    throw new UserError('Your answer must END with the expression whose result should be checked,\n  e.g. `db.products.find({...})` — not with a variable declaration or other statement.');
-  }
-  const before = src.slice(0, last.start);
-  const expr = src.slice(last.expression.start, last.expression.end);
-  return `${before}
-globalThis.__tutorRaw = (${expr});
-let __tutorVal = globalThis.__tutorRaw;
-if (__tutorVal && typeof __tutorVal.toArray === 'function') __tutorVal = __tutorVal.toArray();
-if (__tutorVal === undefined) __tutorVal = null;
-print(${JSON.stringify(MARKER)} + EJSON.stringify({ value: __tutorVal }, { relaxed: true }));
-`;
+  if (!fn) throw new UserError('No `solution` function found. Your file should contain:\n  async function solution(db) {\n    return ...;\n  }');
+  if (!fn.body.body.length) throw new UserError('Your solution() function is still empty — write your query inside it and `return` it.');
+  const lines = [];
+  const capture = (...args) => lines.push(util.format(...args));
+  const sandboxConsole = { log: capture, info: capture, warn: capture, error: capture, dir: (o) => capture(util.inspect(o, { depth: 6 })), table: capture };
+  const script = new vm.Script(`(function (require, console) {${src}\n;return solution;})`, { filename });
+  return { solution: script.runInThisContext()(require, sandboxConsole), lines, warnings: lintWarnings(ast) };
 }
 
-class UserError extends Error {}
+// Explain the most common mistakes in driver terms rather than raw JS errors.
+function explainError(e, filename) {
+  const at = (e.stack || '').split('\n').find((l) => l.includes(filename));
+  const where = at ? `\n  at ${at.trim().replace(/^at /, '').replace(filename, path.relative(process.cwd(), filename) || filename)}` : '';
+  let tip = '';
+  if (/Cannot read properties of undefined \(reading '(find|findOne|countDocuments|distinct|aggregate|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|replaceOne)'\)/.test(e.message)) {
+    tip = '\n  Tip: with the Node driver, get a collection with db.collection("products") — `db.products` is mongosh-only syntax.';
+  } else if (/ISODate is not defined/.test(e.message)) {
+    tip = '\n  Tip: ISODate() is mongosh-only. In Node, use new Date("2025-01-01").';
+  } else if (/ObjectId is not defined/.test(e.message)) {
+    tip = '\n  Tip: import it first:  const { ObjectId } = require("mongodb");  then use new ObjectId("…").';
+  }
+  const kind = e.name && e.name.startsWith('Mongo') ? 'MongoDB error' : 'Error while running your code';
+  return new UserError(`${kind}: ${e.message}${where}${tip}`);
+}
 
-function runCode(src, dbName) {
-  const script = buildScript(src);
-  const tmpDir = path.join(ROOT, '.tmp');
-  fs.mkdirSync(tmpDir, { recursive: true });
-  const file = path.join(tmpDir, `run-${process.pid}-${Date.now()}.js`);
-  fs.writeFileSync(file, script);
+// Runs the file's solution(db) against `dbName`. The returned value is awaited,
+// cursors are drained with toArray(), and the result is converted to relaxed EJSON.
+async function runCode(src, dbName, filename = path.join(ROOT, '.tmp', 'answer.js')) {
+  const { solution, lines, warnings } = compile(src, filename);
+  const db = await getDb(dbName);
+  let raw;
   try {
-    const res = spawnSync('mongosh', [uri(dbName), '--quiet', file], { encoding: 'utf8', env: { ...process.env, NODE_NO_WARNINGS: '1' } });
-    const out = res.stdout || '';
-    const idx = out.lastIndexOf(MARKER);
-    if (idx === -1) {
-      const err = (res.stderr || out).trim().split('\n').filter((l) => !/DeprecationWarning|trace-warnings|MONGODB DRIVER/.test(l)).join('\n');
-      throw new UserError(`MongoDB/mongosh error:\n  ${err.replace(/\n/g, '\n  ')}`);
-    }
-    const printed = out.slice(0, idx).trim();
-    const parsed = JSON.parse(out.slice(idx + MARKER.length).trim().split('\n')[0]);
-    if (parsed.noReturn) throw new UserError('Your solution() returned nothing (undefined). Did you forget the `return` keyword?\n  e.g.  return db.products.find({ ... });');
-    const value = parsed.value;
-    return { value, printed };
-  } finally {
-    fs.rmSync(file, { force: true });
+    raw = await solution(db);
+    if (raw && typeof raw.toArray === 'function') raw = await raw.toArray();
+  } catch (e) {
+    throw explainError(e, filename);
   }
+  if (raw === undefined) throw new UserError('Your solution() returned nothing (undefined). Did you forget the `return` keyword?\n  e.g.  return db.collection("products").find({ ... }).toArray();');
+  const value = JSON.parse(BSON.EJSON.stringify(raw, { relaxed: true }));
+  return { value, printed: lines.join('\n'), warnings };
 }
 
-function seed(dbName) {
-  execFileSync('mongosh', [uri('admin'), '--quiet', path.join(ROOT, 'seed', 'seed.js')], {
-    encoding: 'utf8', env: { ...process.env, SEED_DB: dbName },
-  });
+// A write exercise's `verify` is a driver expression using `db`, e.g.
+// `db.collection("products").find({}, { projection: { stock: 1 } }).sort({ _id: 1 })`.
+const runVerify = (expr, dbName) => runCode(`async function solution(db) { return ${expr}; }`, dbName, path.join(ROOT, 'tutor', 'exercises.json'));
+
+async function seed(dbName) {
+  return require('../seed/seed').seed(await getDb(dbName));
 }
 
-function dropDb(dbName) {
-  spawnSync('mongosh', [uri(dbName), '--quiet', '--eval', 'db.dropDatabase()'], { encoding: 'utf8' });
+async function dropDb(dbName) {
+  await (await getDb(dbName)).dropDatabase();
 }
 
 // Canonical form for comparison: object keys sorted, floats rounded.
@@ -165,4 +213,4 @@ const preview = (v, max = 3) => {
   return '    ' + JSON.stringify(v);
 };
 
-module.exports = { ROOT, EXERCISES, uri, resolveId, hasCode, runCode, seed, dropDb, compare, preview, UserError };
+module.exports = { ROOT, EXERCISES, uri, resolveId, hasCode, getDb, close, runCode, runVerify, seed, dropDb, compare, preview, UserError };

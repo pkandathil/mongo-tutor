@@ -4,7 +4,7 @@
 //        npm run check -- 01/03 --solution (verify the reference solution itself; for the tutor)
 const fs = require('fs');
 const path = require('path');
-const { ROOT, EXERCISES, resolveId, hasCode, runCode, seed, dropDb, compare, preview, UserError } = require('./lib');
+const { ROOT, EXERCISES, resolveId, hasCode, runCode, runVerify, seed, dropDb, close, compare, preview, UserError } = require('./lib');
 
 const args = process.argv.slice(2);
 const useSolution = args.includes('--solution');
@@ -27,6 +27,7 @@ if (!ids.length) {
   process.exit(1);
 }
 
+async function main() {
 let failures = 0, attempted = 0;
 for (const id of ids) {
   const meta = EXERCISES[id];
@@ -41,21 +42,21 @@ for (const id of ids) {
   const answer = fs.readFileSync(answerPath, 'utf8');
   const solution = fs.readFileSync(solutionPath, 'utf8');
   try {
-    let actual, expected;
+    let actual, expected, warnings = [];
     if (meta.kind === 'write') {
       // Each side runs against its own fresh copy of the data, then the
       // `verify` expression inspects the resulting state.
-      seed('tutor_check_user');
-      runCode(answer, 'tutor_check_user');
-      actual = runCode(meta.verify, 'tutor_check_user').value;
-      seed('tutor_check_ref');
-      runCode(solution, 'tutor_check_ref');
-      expected = runCode(meta.verify, 'tutor_check_ref').value;
-      dropDb('tutor_check_user');
-      dropDb('tutor_check_ref');
+      await seed('tutor_check_user');
+      ({ warnings } = await runCode(answer, 'tutor_check_user', answerPath));
+      actual = (await runVerify(meta.verify, 'tutor_check_user')).value;
+      await seed('tutor_check_ref');
+      await runCode(solution, 'tutor_check_ref', solutionPath);
+      expected = (await runVerify(meta.verify, 'tutor_check_ref')).value;
+      await dropDb('tutor_check_user');
+      await dropDb('tutor_check_ref');
     } else {
-      actual = runCode(answer, 'tutor').value;
-      expected = runCode(solution, 'tutor').value;
+      ({ value: actual, warnings } = await runCode(answer, 'tutor', answerPath));
+      expected = (await runCode(solution, 'tutor', solutionPath)).value;
     }
     const r = compare(actual, expected, meta);
     if (r.equal) {
@@ -65,6 +66,7 @@ for (const id of ids) {
     }
     failures++;
     console.log(`❌ FAIL  ${label}`);
+    for (const w of warnings) console.log(`   ${w.replace(/\n/g, '\n   ')}`);
     if (Array.isArray(actual) && Array.isArray(expected)) {
       console.log(`   You returned ${actual.length} item(s); expected ${expected.length}.`);
       if (r.missing.length) console.log(`   Missing (expected but not in yours) — ${r.missing.length}:\n${preview(r.missing)}`);
@@ -80,11 +82,16 @@ for (const id of ids) {
     }
   } catch (e) {
     failures++;
-    if (e instanceof UserError) console.log(`❌ ERROR ${label}\n   ${e.message}`);
+    if (e instanceof UserError) console.log(`❌ ERROR ${label}\n   ${e.message.replace(/\n  /g, "\n   ")}`);
     else throw e;
   }
 }
 if (ids.length > 1) {
   console.log(attempted ? `\n${attempted - failures}/${attempted} attempted passing (${ids.length} exercises in module)` : `No answers written yet for "${target}".`);
 }
-process.exit(failures ? 1 : 0);
+return failures;
+}
+
+main()
+  .then(async (failures) => { await close(); process.exit(failures ? 1 : 0); })
+  .catch(async (e) => { await close(); console.error(e instanceof UserError ? e.message : e); process.exit(1); });
