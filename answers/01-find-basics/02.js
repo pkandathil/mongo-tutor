@@ -9,5 +9,5 @@
 // Grade it:         npm run check -- 01/02
 
 async function solution(db) {
-
+    return db.collection("customers").findOne({"email": "priya.singh2@example.com"});
 }
