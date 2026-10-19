@@ -9,5 +9,5 @@
 // Grade it:         npm run check -- 01/03
 
 async function solution(db) {
-
+    return await db.collection("products").find({"category": "history", "format": "hardcover"});
 }
