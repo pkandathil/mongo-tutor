@@ -1,0 +1,13 @@
+// Exercise 01.05 — How many cancelled orders?
+// Task: exercises/01-find-basics/05.md   ·   Collection: orders
+//
+// `db` is already connected to the practice database — no connection code needed.
+// Write your query inside the function and RETURN its result, for example:
+//     return db.orders.find({ someField: "some value" });
+//
+// See your output:  npm run try -- 01/05
+// Grade it:         npm run check -- 01/05
+
+function solution(db) {
+
+}

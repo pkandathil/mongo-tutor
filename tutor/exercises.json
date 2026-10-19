@@ -1,0 +1,281 @@
+{
+  "01-find-basics/01": {
+    "title": "All cooking products",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "find",
+      "equality"
+    ]
+  },
+  "01-find-basics/02": {
+    "title": "Look up one customer by email",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "findOne",
+      "equality"
+    ]
+  },
+  "01-find-basics/03": {
+    "title": "Hardcover history books",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "find",
+      "equality",
+      "implicit-and"
+    ]
+  },
+  "01-find-basics/04": {
+    "title": "Customers in Lisbon",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "find",
+      "dot-notation",
+      "embedded-docs"
+    ]
+  },
+  "01-find-basics/05": {
+    "title": "How many cancelled orders?",
+    "collection": "orders",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "countDocuments",
+      "equality"
+    ]
+  },
+  "01-find-basics/06": {
+    "title": "Books from one publisher",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "find",
+      "dot-notation",
+      "embedded-docs"
+    ]
+  },
+  "01-find-basics/07": {
+    "title": "VIP customers",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "find",
+      "arrays",
+      "equality"
+    ]
+  },
+  "01-find-basics/08": {
+    "title": "Which countries do customers live in?",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "distinct",
+      "dot-notation"
+    ]
+  },
+  "02-query-operators/01": {
+    "title": "Bargain products",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$lt",
+      "comparison"
+    ]
+  },
+  "02-query-operators/02": {
+    "title": "Customers aged 25–35",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$gte",
+      "$lte",
+      "comparison",
+      "ranges"
+    ]
+  },
+  "02-query-operators/03": {
+    "title": "Big orders placed in 2025",
+    "collection": "orders",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "dates",
+      "ranges",
+      "comparison",
+      "implicit-and"
+    ]
+  },
+  "02-query-operators/04": {
+    "title": "Fiction, mystery or fantasy",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$in"
+    ]
+  },
+  "02-query-operators/05": {
+    "title": "Premium tiers only",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$nin",
+      "$in"
+    ]
+  },
+  "02-query-operators/06": {
+    "title": "Unavailable products",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$or",
+      "logical"
+    ]
+  },
+  "02-query-operators/07": {
+    "title": "Customers with no phone number",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$exists",
+      "missing-fields"
+    ]
+  },
+  "02-query-operators/08": {
+    "title": "null vs missing",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$type",
+      "null",
+      "missing-fields"
+    ]
+  },
+  "02-query-operators/09": {
+    "title": "Titles starting with \"The\"",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$regex",
+      "strings"
+    ]
+  },
+  "02-query-operators/10": {
+    "title": "Combining AND and OR",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "$or",
+      "implicit-and",
+      "logical",
+      "$lt",
+      "$gte"
+    ]
+  },
+  "03-shaping-results/01": {
+    "title": "Sci-fi titles and prices",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "projection"
+    ]
+  },
+  "03-shaping-results/02": {
+    "title": "Five most expensive products",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": true,
+    "tags": [
+      "sort",
+      "limit",
+      "projection"
+    ]
+  },
+  "03-shaping-results/03": {
+    "title": "Alphabetical customer list",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": true,
+    "tags": [
+      "sort",
+      "limit",
+      "projection",
+      "multi-key-sort"
+    ]
+  },
+  "03-shaping-results/04": {
+    "title": "Pagination: page 3",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": true,
+    "tags": [
+      "sort",
+      "skip",
+      "limit",
+      "pagination"
+    ]
+  },
+  "03-shaping-results/05": {
+    "title": "Hide the line items",
+    "collection": "orders",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "projection",
+      "exclusion"
+    ]
+  },
+  "03-shaping-results/06": {
+    "title": "Count the crowd favourites",
+    "collection": "products",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "countDocuments",
+      "dot-notation",
+      "$gte"
+    ]
+  },
+  "03-shaping-results/07": {
+    "title": "Latest three orders",
+    "collection": "orders",
+    "kind": "read",
+    "orderMatters": true,
+    "tags": [
+      "sort",
+      "limit",
+      "projection",
+      "dates"
+    ]
+  },
+  "03-shaping-results/08": {
+    "title": "Projecting a nested field",
+    "collection": "customers",
+    "kind": "read",
+    "orderMatters": false,
+    "tags": [
+      "projection",
+      "dot-notation",
+      "embedded-docs"
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "mongo-tutor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive MongoDB query & aggregation practice environment",
+  "scripts": {
+    "db:up": "docker compose up -d && node tutor/wait-for-db.js",
+    "db:down": "docker compose down",
+    "db:shell": "mongosh \"mongodb://localhost:27018/tutor?directConnection=true\"",
+    "seed": "mongosh \"mongodb://localhost:27018/tutor?directConnection=true\" --quiet seed/seed.js",
+    "check": "node tutor/check.js",
+    "try": "node tutor/try.js",
+    "status": "node tutor/status.js"
+  },
+  "dependencies": {
+    "acorn": "^8.19.0"
+  }
+}

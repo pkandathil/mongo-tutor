@@ -1,0 +1,13 @@
+services:
+  mongo-tutor:
+    image: mongodb/mongodb-atlas-local:8.0
+    container_name: mongo-tutor
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-tutor-data:/data/db
+      - mongo-tutor-config:/data/configdb
+
+volumes:
+  mongo-tutor-data:
+  mongo-tutor-config:
