@@ -9,5 +9,5 @@
 // Grade it:         npm run check -- 01/04
 
 async function solution(db) {
-
+    return db.collection("customers").find({"address.city": "Lisbon"})
 }
