@@ -9,5 +9,5 @@
 // Grade it:         npm run check -- 01/08
 
 async function solution(db) {
-
+    return await db.collection("customers").distinct("address.country");
 }
