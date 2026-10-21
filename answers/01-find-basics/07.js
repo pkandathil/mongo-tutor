@@ -9,5 +9,5 @@
 // Grade it:         npm run check -- 01/07
 
 async function solution(db) {
-
+    return await db.collection("customers").find({tags: "vip"})
 }
