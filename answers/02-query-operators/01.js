@@ -9,5 +9,5 @@
 // Grade it:         npm run check -- 02/01
 
 async function solution(db) {
-
+    return await db.collection("products").find({"price": {$lt: 10}})
 }
